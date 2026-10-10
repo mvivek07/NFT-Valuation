@@ -178,6 +178,28 @@ Upload `notebooks/NFT_Analysis_Colab.ipynb` at https://colab.research.google.com
 entire pipeline self-contained, with options to upload your CSV, mount Google Drive,
 or generate synthetic data.
 
+## Upload a CSV (batch valuation)
+
+The Predictor page has an **Upload a CSV** tab that values many NFTs at once
+(`POST /api/predict-csv`, up to 5,000 rows / 12 MB). Columns are matched by name
+against the dataset's 121 feature columns; missing ones use the typical value and
+unknown ones are ignored. Optional columns: `name`, `listing_price_usd` (adds a
+fair-price check) and `price_label` 0–5 (scores the predictions). Results can be
+downloaded as a CSV.
+
+Two sample files built from real held-out test NFTs are included and downloadable
+from the page: `data/sample_upload_full.csv` (20 NFTs, all columns, with answers) and
+`data/sample_upload_minimal.csv` (10 NFTs, 11 columns). Regenerate them with
+`python backend/src/make_sample_csv.py`.
+
+## Real NFTs, row by row
+
+In the Predictor's **Real NFT from the test set** tab, "Many NFTs, row by row" draws
+10–250 random held-out test NFTs (`GET /api/sample-batch?n=50`), predicts them all and
+lists each one next to what really happened: actual class, sale price, correct/missed.
+Rows can be filtered to correct or missed, downloaded as CSV, and opened in the
+single-NFT detail view.
+
 ## Windows (PowerShell) without `run.sh`
 
 Run these one at a time, from the project folder:

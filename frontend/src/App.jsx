@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getMeta, getCharts, getSample, postPredict, postLive } from "./api.js";
+import { getMeta, getCharts, getSample, getSampleBatch, postPredict, postLive } from "./api.js";
 import { useTheme } from "./theme.js";
 import Navbar, { ROUTES } from "./components/Navbar.jsx";
 import Logo from "./components/Logo.jsx";
@@ -27,6 +27,10 @@ export default function App() {
   const [sample, setSample] = useState(null);
   const [result, setResult] = useState(null);
   const [live, setLive] = useState(null);
+  const [csv, setCsv] = useState(null);
+  const [realView, setRealView] = useState("single");   // single | batch
+  const [batch, setBatch] = useState(null);
+  const [batchBusy, setBatchBusy] = useState(false);
   const [status, setStatus] = useState("idle");
 
   useEffect(() => {
@@ -51,6 +55,34 @@ export default function App() {
       const s = await getSample();
       setSample(s);
       setStatus(`asset #${s.row_id} loaded`);
+    } catch {
+      setStatus("load failed");
+    }
+  };
+
+  const handleLoadBatch = async (n) => {
+    setBatchBusy(true);
+    try {
+      setBatch(await getSampleBatch(n));
+    } catch (e) {
+      alert("Could not load the batch: " + e.message);
+    } finally {
+      setBatchBusy(false);
+    }
+  };
+
+  // "Details" on a batch row: open that NFT in the single view and predict it
+  const handleOpenRow = async (rowId) => {
+    setRealView("single");
+    setResult(null);
+    setStatus("loading asset…");
+    document.querySelector(".mode-tabs")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    try {
+      const s = await getSample(rowId);
+      setSample(s);
+      setStatus("predicting…");
+      setResult(await postPredict({ row_id: s.row_id }));
+      setStatus("done");
     } catch {
       setStatus("load failed");
     }
@@ -104,7 +136,9 @@ export default function App() {
       {route === "predictor" && (
         <Predictor
           meta={meta} mode={mode} setMode={switchMode} sample={sample} values={values}
-          status={status} result={result} live={live}
+          status={status} result={result} live={live} csv={csv} setCsv={setCsv}
+          realView={realView} setRealView={setRealView} batch={batch} batchBusy={batchBusy}
+          onLoadBatch={handleLoadBatch} onOpenRow={handleOpenRow}
           onChange={handleChange} onLoadSample={handleLoadSample} onClear={handleClear}
           onPredict={handlePredict} onLookup={handleLookup}
         />

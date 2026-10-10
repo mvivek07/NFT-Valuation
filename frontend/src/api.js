@@ -18,7 +18,13 @@ const post = (url, body) =>
 
 export const getMeta = () => json("/api/meta");
 export const getCharts = () => json("/api/charts");
-export const getSample = () => json("/api/sample");
+export const getSample = (rowId) => json(rowId == null ? "/api/sample" : `/api/sample?row_id=${rowId}`);
+export const getSampleBatch = (n) => json(`/api/sample-batch?n=${n}`);
 export const getPreview = () => json("/api/preview");
 export const postPredict = (body) => post("/api/predict", body);
 export const postLive = (body) => post("/api/live", body);
+export const postCsv = (file) => {
+  const form = new FormData();
+  form.append("file", file);
+  return json("/api/predict-csv", { method: "POST", body: form });
+};

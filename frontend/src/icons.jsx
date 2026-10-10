@@ -21,5 +21,6 @@ export const Icon = {
   layers: () => <svg {...base}><path d="M12 3 21 8l-9 5-9-5Z" /><path d="m3 12.5 9 5 9-5" /><path d="m3 17 9 5 9-5" opacity=".5" /></svg>,
   wave: () => <svg {...base}><path d="M2.5 12c2.2-5 4.2-5 6.4 0s4.2 5 6.4 0 4.2-5 6.2 0" /></svg>,
   tag: () => <svg {...base}><path d="M3.5 12.5V4.5h8l9 9-8 8Z" /><circle cx="8" cy="9" r="1.3" /></svg>,
+  upload: () => <svg {...base}><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>,
   refresh: () => <svg {...base}><path d="M20 12a8 8 0 1 1-2.4-5.7" /><path d="M20 4v5h-5" /></svg>,
 };

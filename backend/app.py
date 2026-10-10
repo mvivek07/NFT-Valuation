@@ -103,6 +103,7 @@ _, TEST_IDX = train_test_split(
 )
 
 TARGET_COLS = ["avg_price_usd", "price_label", "sale_label", "permalink"]
+TEST_SET = set(int(i) for i in TEST_IDX)
 RAW_COLS = [c for c in DF.columns if c != "permalink"]
 
 FRIENDLY = {
@@ -345,7 +346,9 @@ def _val(row, col):
 @app.get("/api/sample")
 def sample():
     """A random held-out test asset: form values + readable profile + truth."""
-    i = int(np.random.choice(TEST_IDX))
+    i = request.args.get("row_id", type=int)
+    if i is None or i not in TEST_SET:
+        i = int(np.random.choice(TEST_IDX))
     row = DF.iloc[i]
     values = {f: _val(row, f) for f in FORM_FIELDS}
     profile = {
@@ -452,6 +455,206 @@ def live():
     result["live"] = {k: v for k, v in live_data.items() if k != "features"}
     result["live"]["features"] = live_data["features"]
     return jsonify(result)
+
+
+# --------------------------------------------------------------------------
+# CSV upload: value many NFTs at once
+# --------------------------------------------------------------------------
+FEATURE_COLS = [c for c in DF.columns if c not in TARGET_COLS + ["listing_price_usd"]]
+CSV_MAX_ROWS = 5000
+app.config["MAX_CONTENT_LENGTH"] = 12 * 1024 * 1024      # 12 MB upload limit
+
+ASKING_ALIASES = ["listing_price_usd", "asking_price_usd", "asking_price", "listing_usd"]
+ID_ALIASES = ["name", "asset_name", "nft", "permalink", "asset_id", "id"]
+SAMPLE_FILES = {
+    "full": "sample_upload_full.csv",
+    "minimal": "sample_upload_minimal.csv",
+}
+_TRUTHY = {"true": 1, "yes": 1, "y": 1, "false": 0, "no": 0, "n": 0}
+
+
+def predict_frame(raw: pd.DataFrame):
+    """Run every model on many rows. `raw` holds dataset feature columns."""
+    feats = engineer_features(raw)
+    X = feats.drop(columns=[c for c in TARGET_COLS + ["listing_price_usd"] if c in feats.columns])
+    rf_p = RF.predict_proba(X)
+    svm_s = SVM.decision_function(X)
+    Z = HYBRID_PREP.transform(X).astype(np.float32)
+    gru_p = gru_proba(GRU, build_sequence(X), Z)
+    reg = LINREG.predict(Z)
+    return {
+        "final": KNN.predict(meta_features(rf_p, svm_s, gru_p, reg)),
+        "gru_rnn": np.array(CLASS_ORDER)[gru_p.argmax(1)],
+        "svm": SVM.predict(X),
+        "random_forest": RF.predict(X),
+        "confidence": gru_p.max(1),
+        "regression_price_usd": 10 ** reg,
+    }
+
+
+def _actual_classes(df: pd.DataFrame):
+    """Optional answer column: price_label (0-5) or price_class / actual_class (names)."""
+    if "price_label" in df.columns:
+        lab = pd.to_numeric(df["price_label"], errors="coerce")
+        return lab.map(lambda v: CLASS_NAMES.get(int(v)) if pd.notna(v) and int(v) in CLASS_NAMES else None)
+    for col in ("price_class", "actual_class"):
+        if col in df.columns:
+            s = df[col].astype(str).str.strip().str.lower()
+            return s.where(s.isin(CLASS_ORDER), None)
+    return None
+
+
+@app.post("/api/predict-csv")
+def predict_csv():
+    """Value every NFT in an uploaded CSV with the full hybrid model.
+
+    Columns are matched by name against the dataset's feature columns; any that
+    are missing are filled with the typical value, unknown ones are ignored.
+    Optional columns: an asking price (for the fair-price verdict), an answer
+    column (to score the predictions) and a name/id column (for display).
+    """
+    f = request.files.get("file")
+    if f is None or not f.filename:
+        return jsonify({"error": "No file received. Choose a .csv file first."}), 400
+    try:
+        df = pd.read_csv(f.stream, sep=None, engine="python")
+    except Exception as e:
+        return jsonify({"error": f"Could not read this file as CSV ({type(e).__name__}). "
+                                 "Save it as a comma-separated .csv and try again."}), 400
+
+    df.columns = [str(c).strip() for c in df.columns]
+    df = df.dropna(how="all")
+    if df.empty:
+        return jsonify({"error": "The file has a header but no data rows."}), 400
+    used = [c for c in FEATURE_COLS if c in df.columns]
+    if not used:
+        return jsonify({"error": "None of the column names match the dataset. Download a sample "
+                                 "file to see the expected column names (for example "
+                                 "followers_count_mean, nlikes_mean, floor_price, total_sales)."}), 400
+    truncated = len(df) > CSV_MAX_ROWS
+    df = df.head(CSV_MAX_ROWS).reset_index(drop=True)
+
+    # numeric feature frame, in the dataset's column order
+    raw = pd.DataFrame(index=df.index, columns=DF.columns, dtype="float64")
+    for c in used:
+        col = df[c]
+        if col.dtype == object:
+            col = col.map(lambda v: _TRUTHY.get(str(v).strip().lower(), v))
+        raw[c] = pd.to_numeric(col, errors="coerce")
+    raw = raw.replace([np.inf, -np.inf], np.nan)
+
+    out = predict_frame(raw)
+
+    ask_col = next((c for c in ASKING_ALIASES if c in df.columns), None)
+    asking = pd.to_numeric(df[ask_col], errors="coerce").tolist() if ask_col else None
+    id_col = next((c for c in ID_ALIASES if c in df.columns), None)
+    actual = _actual_classes(df)
+    labels = [
+        str(df[id_col][i]) if id_col and pd.notna(df[id_col][i]) else f"row {i + 1}"
+        for i in range(len(df))
+    ]
+    payload = _batch_payload(out, labels, asking, None if actual is None else actual.tolist())
+
+    known = set(FEATURE_COLS) | set(ASKING_ALIASES) | set(ID_ALIASES) | {
+        "price_label", "price_class", "actual_class", "sale_label", "avg_price_usd"}
+    payload.update({
+        "source": "csv",
+        "filename": f.filename,
+        "truncated": truncated,
+        "max_rows": CSV_MAX_ROWS,
+        "columns_used": len(used),
+        "columns_total": len(FEATURE_COLS),
+        "columns_ignored": [c for c in df.columns if c not in known][:20],
+        "has_asking": ask_col is not None,
+    })
+    return jsonify(payload)
+
+
+def _batch_payload(out, labels, asking=None, actual=None, extra=None):
+    """Row-by-row results + summary shared by CSV upload and the real-NFT batch."""
+    rows, verdicts, n_scored, n_correct = [], {}, 0, 0
+    for i, label in enumerate(labels):
+        final = str(out["final"][i])
+        ask = asking[i] if asking is not None else None
+        ask = float(ask) if ask is not None and pd.notna(ask) else None
+        val = valuation(final, ask)
+        if val:
+            verdicts[val["verdict"]] = verdicts.get(val["verdict"], 0) + 1
+        act = actual[i] if actual is not None else None
+        correct = None
+        if act:
+            n_scored += 1
+            correct = act == final
+            n_correct += int(correct)
+        row = {
+            "row": i + 1,
+            "id": label if len(label) <= 46 else "…" + label[-44:],
+            "final": final,
+            "gru_rnn": str(out["gru_rnn"][i]),
+            "svm": str(out["svm"][i]),
+            "random_forest": str(out["random_forest"][i]),
+            "confidence": round(float(out["confidence"][i]), 3),
+            "regression_price_usd": round(float(out["regression_price_usd"][i]), 2),
+            "asking_usd": None if ask is None else round(ask, 2),
+            "valuation": val["verdict"] if val else None,
+            "actual": act,
+            "correct": correct,
+        }
+        if extra:
+            row.update(extra[i])
+        rows.append(row)
+
+    counts = pd.Series([r["final"] for r in rows]).value_counts()
+    return {
+        "n_rows": len(rows),
+        "has_asking": asking is not None,
+        "has_actual": n_scored > 0,
+        "class_counts": [{"cls": c, "count": int(counts.get(c, 0))} for c in CLASS_ORDER],
+        "verdict_counts": verdicts,
+        "n_scored": n_scored,
+        "n_correct": n_correct,
+        "accuracy": round(n_correct / n_scored, 4) if n_scored else None,
+        "rows": rows,
+    }
+
+
+BATCH_SIZES = (10, 25, 50, 100, 250)
+
+
+@app.get("/api/sample-batch")
+def sample_batch():
+    """Predict N random held-out test NFTs at once and compare with reality."""
+    try:
+        n = int(request.args.get("n", 25))
+    except ValueError:
+        n = 25
+    n = min(max(n, 1), max(BATCH_SIZES))
+    idx = np.random.choice(TEST_IDX, size=n, replace=False)
+    part = DF.iloc[idx]
+    out = predict_frame(part.copy())
+    payload = _batch_payload(
+        out,
+        labels=[f"NFT #{int(i)}" for i in idx],
+        asking=part["listing_price_usd"].tolist(),
+        actual=[CLASS_NAMES[int(v)] for v in part["price_label"]],
+        extra=[{"row_id": int(i), "sold_usd": round(float(p), 2)}
+               for i, p in zip(idx, part["avg_price_usd"])],
+    )
+    payload.update({"source": "test_set", "n_test": int(len(TEST_IDX))})
+    return jsonify(payload)
+
+
+@app.errorhandler(413)
+def too_large(_e):
+    return jsonify({"error": "That file is larger than 12 MB. Split it into smaller files."}), 413
+
+
+@app.get("/api/sample-csv/<kind>")
+def sample_csv(kind):
+    name = SAMPLE_FILES.get(kind)
+    if not name or not (ROOT / "data" / name).exists():
+        return jsonify({"error": "Sample file not found."}), 404
+    return send_from_directory(ROOT / "data", name, as_attachment=True, mimetype="text/csv")
 
 
 @app.get("/figures/<path:name>")
