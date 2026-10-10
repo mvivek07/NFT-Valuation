@@ -1,0 +1,20 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node / frontend build
+frontend/node_modules/
+frontend/dist/
+
+# Trained models are recreated by ./run.sh setup (the Random Forest alone is 220 MB,
+# over GitHub's 100 MB file limit)
+models/
+
+# Raw downloaded dataset (1.9 GB). The merged training file data/nft_dataset_real.csv
+# IS committed, so this folder is only needed for ./run.sh data
+FinWebWWW/
+
+# Scratch output
+reports/predictions.csv
+.DS_Store

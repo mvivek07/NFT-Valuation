@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NFT Valuator</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💎</text></svg>">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2 L21 9 L12 22 L3 9 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+      <path d="M3 9 H21 M12 2 L8 9 L12 22 L16 9 Z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round" opacity=".55"/>
+    </svg>
+    <div>
+      <div class="brand-name">NFT Valuator</div>
+      <div class="brand-sub">Trending-NFT analysis · Time-series data &amp; machine learning</div>
+    </div>
+  </div>
+  <div class="badge-dept">CSE (Data Science) · 2026-27</div>
+</nav>
+
+<main class="wrap">
+
+  <!-- Stat tiles -->
+  <section class="tiles" id="tiles" aria-label="Key statistics">
+    <div class="tile"><div class="tile-value" id="t-assets">—</div><div class="tile-label">Real NFT assets (OpenSea · Jan–Mar 2021)</div></div>
+    <div class="tile"><div class="tile-value" id="t-svm">—</div><div class="tile-label">SVM (RBF) accuracy · best model</div></div>
+    <div class="tile"><div class="tile-value" id="t-rf">—</div><div class="tile-label">Random Forest accuracy</div></div>
+    <div class="tile"><div class="tile-value" id="t-feat">—</div><div class="tile-label">Features → PCA (95% variance)</div></div>
+  </section>
+
+  <!-- Predictor -->
+  <section class="grid-two">
+    <div class="card">
+      <div class="card-head">
+        <h2>Asset inputs</h2>
+        <div class="head-actions">
+          <button class="btn ghost" id="btn-clear" type="button">Clear</button>
+          <button class="btn secondary" id="btn-sample" type="button">Load real NFT</button>
+        </div>
+      </div>
+      <p class="hint">Enter what you know — any field left blank is filled with the dataset median by the pipeline. Or load a real held-out asset the models never trained on.</p>
+
+      <form id="form" autocomplete="off">
+        <fieldset>
+          <legend>Twitter signals</legend>
+          <div class="fields">
+            <label>Creator followers (avg)<input type="number" step="any" min="0" name="followers_count_mean" placeholder="e.g. 1500"></label>
+            <label>Likes per tweet (avg)<input type="number" step="any" min="0" name="nlikes_mean" placeholder="e.g. 12"></label>
+            <label>Retweets per tweet (avg)<input type="number" step="any" min="0" name="nretweets_mean" placeholder="e.g. 4"></label>
+            <label>Replies per tweet (avg)<input type="number" step="any" min="0" name="nreplies_mean" placeholder="e.g. 2"></label>
+            <label>Tweets about this NFT<input type="number" step="any" min="0" name="number_of_tweets" placeholder="e.g. 3"></label>
+            <label class="check"><input type="checkbox" name="verified" value="1"> Verified creator account</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>OpenSea market data</legend>
+          <div class="fields">
+            <label>Collection floor price<input type="number" step="any" min="0" name="floor_price" placeholder="e.g. 0.05"></label>
+            <label>Collection avg price<input type="number" step="any" min="0" name="average_price" placeholder="e.g. 0.2"></label>
+            <label>Collection total sales<input type="number" step="any" min="0" name="total_sales" placeholder="e.g. 800"></label>
+            <label>Collection owners<input type="number" step="any" min="0" name="num_owners" placeholder="e.g. 450"></label>
+            <label>Asset events (all)<input type="number" step="any" min="0" name="numEvents" placeholder="e.g. 6"></label>
+            <label>Successful sales (asset)<input type="number" step="any" min="0" name="successful" placeholder="e.g. 1"></label>
+          </div>
+        </fieldset>
+        <button class="btn primary" id="btn-predict" type="submit">Predict price class</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Prediction</h2><span class="chip chip-live" id="status-chip">idle</span></div>
+
+      <div id="result-empty" class="empty">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 L21 9 L12 22 L3 9 Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        <p>Run a prediction to see which price class this asset falls into.</p>
+      </div>
+
+      <div id="result" hidden>
+        <div class="verdict">
+          <div class="verdict-class" id="v-class">—</div>
+          <div class="verdict-range" id="v-range">—</div>
+        </div>
+
+        <div class="model-row">
+          <div class="model-chip"><span class="model-name">SVM (RBF)</span><span class="model-pred" id="m-svm">—</span></div>
+          <div class="model-chip"><span class="model-name">Random Forest</span><span class="model-pred" id="m-rf">—</span></div>
+          <div class="model-chip" id="agree-chip"><span class="model-name">Agreement</span><span class="model-pred" id="m-agree">—</span></div>
+        </div>
+
+        <div id="truth-row" class="truth" hidden>
+          <span>Actual (held-out test set):</span> <strong id="truth-class">—</strong><span id="truth-price"></span>
+          <span class="truth-flag" id="truth-flag"></span>
+        </div>
+
+        <h3 class="proba-title">Random Forest class probabilities</h3>
+        <div class="proba" id="proba" role="img" aria-label="Predicted probability per price class"></div>
+        <p class="footnote">Probabilities from the Random Forest (SVM outputs a class only). Classes are logarithmic price bands computed from average selling price.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Class legend -->
+  <section class="card slim">
+    <div class="card-head"><h2>Price classes</h2></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <!-- Evaluation figures -->
+  <section class="card">
+    <div class="card-head"><h2>Model evaluation</h2><span class="hint-inline">Generated from the real dataset — click to open full size</span></div>
+    <div class="figures">
+      <figure><a href="/figures/confusion_svm_rbf.png" target="_blank" rel="noopener"><img src="/figures/confusion_svm_rbf.png" alt="SVM confusion matrix" loading="lazy"></a><figcaption>Confusion matrix — SVM (RBF)</figcaption></figure>
+      <figure><a href="/figures/confusion_random_forest.png" target="_blank" rel="noopener"><img src="/figures/confusion_random_forest.png" alt="Random Forest confusion matrix" loading="lazy"></a><figcaption>Confusion matrix — Random Forest</figcaption></figure>
+      <figure><a href="/figures/price_distribution.png" target="_blank" rel="noopener"><img src="/figures/price_distribution.png" alt="Price distribution" loading="lazy"></a><figcaption>Price distribution (sold assets)</figcaption></figure>
+      <figure><a href="/figures/class_balance.png" target="_blank" rel="noopener"><img src="/figures/class_balance.png" alt="Class balance" loading="lazy"></a><figcaption>Class balance</figcaption></figure>
+      <figure><a href="/figures/pca_variance_svm_rbf.png" target="_blank" rel="noopener"><img src="/figures/pca_variance_svm_rbf.png" alt="PCA variance curve" loading="lazy"></a><figcaption>PCA explained variance</figcaption></figure>
+      <figure><a href="/figures/correlation_heatmap.png" target="_blank" rel="noopener"><img src="/figures/correlation_heatmap.png" alt="Correlation heatmap" loading="lazy"></a><figcaption>Feature ↔ price correlation</figcaption></figure>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  Analysis of Trending NFTs using Time-Series Data and Machine Learning ·
+  Dataset: TweetBoost / FinWeb (62,997 OpenSea assets, Jan–Mar 2021) ·
+  Pipeline: cleaning → feature engineering → PCA → SVM / Random Forest
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

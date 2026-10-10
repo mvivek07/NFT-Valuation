@@ -1,0 +1,29 @@
+{
+  "svm_rbf": {
+    "accuracy": 0.8924,
+    "macro_f1": 0.5026
+  },
+  "random_forest": {
+    "accuracy": 0.8577,
+    "macro_f1": 0.5994
+  },
+  "gru_rnn": {
+    "accuracy": 0.9108,
+    "macro_f1": 0.6524
+  },
+  "linear_regression": {
+    "accuracy": 0.1418,
+    "macro_f1": 0.2384,
+    "r2_sold_assets": 0.3382,
+    "rmse_log10_price": 0.5667,
+    "n_sold_test": 3023
+  },
+  "hybrid_knn": {
+    "accuracy": 0.9151,
+    "macro_f1": 0.5507
+  },
+  "soft_vote": {
+    "accuracy": 0.8968,
+    "macro_f1": 0.6351
+  }
+}
