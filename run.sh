@@ -49,7 +49,7 @@ case "${1:-app}" in
 
     echo "==> [2/5] PyTorch (CPU build)"
     $PY -c "import torch" 2>/dev/null \
-      || $PY -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu \
+      || $PY -m pip install --quiet torch --extra-index-url https://download.pytorch.org/whl/cpu \
       || $PY -m pip install --quiet torch
 
     echo "==> [3/5] Training SVM + Random Forest (about 30 seconds)"

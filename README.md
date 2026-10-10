@@ -180,14 +180,24 @@ or generate synthetic data.
 
 ## Windows (PowerShell) without `run.sh`
 
+Run these one at a time, from the project folder:
+
 ```powershell
 python -m venv .venv
+.venv\Scripts\python -m pip install --upgrade pip
 .venv\Scripts\pip install -r requirements.txt
-.venv\Scripts\pip install torch --index-url https://download.pytorch.org/whl/cpu
+.venv\Scripts\pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
 .venv\Scripts\python backend\src\train.py --data data\nft_dataset_real.csv
 .venv\Scripts\python backend\src\train_hybrid.py --data data\nft_dataset_real.csv
-cd frontend; npm install; npm run build; cd ..
-.venv\Scripts\python backend\app.py          # http://localhost:5000
+cd frontend
+npm install
+npm run build
+cd ..
+.venv\Scripts\python backend\app.py
 ```
+
+Then open http://localhost:5000. Next time only the last line is needed.
+Upgrading pip first matters: the pip bundled with older Python installers fails to
+install PyTorch.
 
 Frontend dev server (second terminal): `cd frontend; npm run dev` → http://localhost:5173

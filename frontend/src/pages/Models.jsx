@@ -14,10 +14,10 @@ const CARDS = [
 ];
 
 const INSIGHTS = [
-  ["1", "blue", "Why 91.5% is a real result", "A model that always answers \"unsold\" already scores about 76%, because most NFTs never sell. The achievement is the roughly 15 points above that baseline."],
+  ["1", "blue", "Why the hybrid score is a real result", "A model that always answers \"unsold\" already scores about 76%, because most NFTs never sell. The achievement is the roughly 15 points above that baseline."],
   ["2", "orange", "Why the neural network helps", "The GRU reads the 1-day, 7-day and 30-day market numbers as a sequence, so it notices a collection heating up or cooling down. The other models only see those as separate numbers."],
   ["3", "violet", "What macro-F1 tells you", "Accuracy is dominated by the huge \"unsold\" class. Macro-F1 scores each class separately and averages them, so it shows how a model copes with the rare expensive bands."],
-  ["4", "aqua", "How the combiner stays honest", "The KNN combiner is trained only on predictions the base models made for NFTs they had not trained on. That keeps its 91.5% a fair estimate."],
+  ["4", "aqua", "How the combiner stays honest", "The KNN combiner is trained only on predictions the base models made for NFTs they had not trained on. That keeps its score a fair estimate."],
   ["5", "magenta", "Why bin4 and bin5 are hard", "Only 211 NFTs ever sold for $10K–100K and 23 for more than $100K. That leaves 42 and 5 examples in the test set — too few for any model to learn reliably."],
   ["6", "green", "Mistakes are usually near misses", "When a model is wrong it nearly always picks the neighbouring band (bin2 instead of bin1), not a wild guess. You can see this next to the diagonal in the confusion matrix."],
 ];
