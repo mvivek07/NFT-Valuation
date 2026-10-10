@@ -27,7 +27,7 @@ const VOTERS = [
 const EMPTY_TEXT = {
   real: "Load a real NFT on the left and press Predict. Every model's answer and the true outcome will appear here.",
   manual: "Fill in what you know about an NFT and press Predict. Blank fields use the dataset's typical value.",
-  live: "Paste an OpenSea link and your API key. The NFT's live market data is fetched and valued here.",
+  live: "Paste an OpenSea NFT link and press Fetch. Its live market data is read from OpenSea and valued here.",
 };
 const VERDICT_TEXT = { fair: "Fairly priced", undervalued: "Looks undervalued", overvalued: "Looks overvalued" };
 

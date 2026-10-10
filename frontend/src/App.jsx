@@ -124,7 +124,7 @@ export default function App() {
       setStatus("done");
     } catch (e) {
       setStatus("error");
-      alert(e.message);
+      throw e;                       // shown inline by the live form
     }
   };
 
